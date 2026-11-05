@@ -34,13 +34,20 @@ async def create_user(sessionmaker: Sessionmaker, email: str, role: UserRole) ->
 async def create_ticket(sessionmaker: Sessionmaker, owner: User) -> Ticket:
     data = TicketCreate(title="Ticket", description="Details", category=TicketCategory.OTHER)
     async with sessionmaker() as session:
-        return await TicketService(session).create(owner, data)
+        return await TicketService(
+            session=session,
+            tickets=TicketRepository(session),
+        ).create(owner, data)
 
 
 async def assign(sessionmaker: Sessionmaker, admin: User, ticket_id: int) -> Ticket:
     # Cada tentativa usa a própria sessão/conexão, como duas requisições reais.
     async with sessionmaker() as session:
-        return await TicketService(session).perform(admin, ticket_id, TicketAction.ASSIGN)
+        service = TicketService(
+            session=session,
+            tickets=TicketRepository(session),
+        )
+        return await service.perform(admin, ticket_id, TicketAction.ASSIGN)
 
 
 async def test_concurrent_assignments_have_exactly_one_winner(sessionmaker: Sessionmaker) -> None:

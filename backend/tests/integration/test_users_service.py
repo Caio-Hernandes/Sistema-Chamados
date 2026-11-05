@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.users.models import User, UserRole
+from app.modules.users.repository import UserRepository
 from app.modules.users.service import UserService
 
 
@@ -11,9 +12,13 @@ async def test_ensure_admin_creates_admin_once(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:
     async with sessionmaker() as session:
-        created = await UserService(session).ensure_admin("Admin", "Admin@Example.com", "pass1234")
+        created = await UserService(session=session, users=UserRepository(session)).ensure_admin(
+            "Admin", "Admin@Example.com", "pass1234"
+        )
     async with sessionmaker() as session:
-        created_again = await UserService(session).ensure_admin("Other", "admin@example.com", "x")
+        created_again = await UserService(
+            session=session, users=UserRepository(session)
+        ).ensure_admin("Other", "admin@example.com", "x")
         admins = (await session.scalars(select(User))).all()
 
     assert created is True

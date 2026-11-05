@@ -8,6 +8,8 @@ from app.core.exceptions import AuthenticationError
 from app.core.security import (
     create_access_token,
     decode_access_token,
+    generate_refresh_token,
+    hash_refresh_token,
     hash_password,
     verify_password,
 )
@@ -55,3 +57,15 @@ def test_token_without_subject_is_rejected() -> None:
 
     with pytest.raises(AuthenticationError):
         decode_access_token(token)
+
+
+def test_refresh_token_is_random_and_hash_is_deterministic() -> None:
+    first = generate_refresh_token()
+    second = generate_refresh_token()
+
+    assert first != second
+    assert len(first) >= 64
+    assert len(hash_refresh_token(first)) == 64
+    assert hash_refresh_token(first) == hash_refresh_token(first)
+    assert hash_refresh_token(first) != hash_refresh_token(second)
+    assert first != hash_refresh_token(first)

@@ -74,6 +74,6 @@ def override_session(sessionmaker: async_sessionmaker[AsyncSession]) -> None:
 @pytest.fixture
 async def client(sessionmaker: async_sessionmaker[AsyncSession]) -> AsyncIterator[AsyncClient]:
     override_session(sessionmaker)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="https://test") as client:
         yield client
     app.dependency_overrides.clear()
