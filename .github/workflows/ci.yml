@@ -13,7 +13,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: Chamados/backend
+        working-directory: /backend
 
     services:
       postgres:
@@ -59,4 +59,4 @@ jobs:
 
       - name: Docker build
         working-directory: .
-        run: docker build -t chamados-api:ci ./Chamados/backend
+        run: docker build -t chamados-api:ci ./backend
