@@ -6,6 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.users.models import UserRole
+from app.modules.users.repository import UserRepository
 from app.modules.users.service import UserService
 
 PASSWORD = "s3cret-pass"
@@ -27,7 +28,9 @@ def make_user(client: AsyncClient, sessionmaker: async_sessionmaker[AsyncSession
     async def _make_user(email: str, role: UserRole = UserRole.USER) -> ApiUser:
         if role == UserRole.ADMIN:
             async with sessionmaker() as session:
-                await UserService(session).ensure_admin("Admin", email, PASSWORD)
+                await UserService(session=session, users=UserRepository(session)).ensure_admin(
+                    "Admin", email, PASSWORD
+                )
         else:
             response = await client.post(
                 "/users", json={"name": "User", "email": email, "password": PASSWORD}

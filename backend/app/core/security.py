@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -45,3 +47,13 @@ def decode_access_token(token: str) -> str:
     except jwt.InvalidTokenError as exc:
         raise AuthenticationError() from exc
     return payload["sub"]
+
+
+def generate_refresh_token() -> str:
+    """Gera um token criptograficamente aleatório."""
+    return secrets.token_urlsafe(48)
+
+
+def hash_refresh_token(token: str) -> str:
+    """Calcula o SHA-256 do refresh token."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

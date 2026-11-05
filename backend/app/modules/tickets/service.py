@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictError
+from app.modules.tickets.contracts import TicketRepositoryProtocol
 from app.modules.tickets.models import Ticket, TicketAction, TicketEvent, TicketStatus
 from app.modules.tickets.policies import (
     TicketNotFoundError,
@@ -11,7 +12,6 @@ from app.modules.tickets.policies import (
     is_admin,
     target_status,
 )
-from app.modules.tickets.repository import TicketRepository
 from app.modules.tickets.schemas import TicketCreate, TicketFilters, TicketUpdate
 from app.modules.users.models import User
 
@@ -21,9 +21,13 @@ class TicketChangedConcurrentlyError(ConflictError):
 
 
 class TicketService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        tickets: TicketRepositoryProtocol,
+    ) -> None:
         self.session = session
-        self.tickets = TicketRepository(session)
+        self.tickets = tickets
 
     async def create(self, user: User, data: TicketCreate) -> Ticket:
         ticket = Ticket(**data.model_dump(), created_by_id=user.id)
@@ -34,6 +38,8 @@ class TicketService:
 
     async def search(self, user: User, filters: TicketFilters) -> tuple[list[Ticket], int]:
         # USER só enxerga os próprios chamados, independentemente dos filtros enviados.
+        # none if é um operador ternário: se for admin, não filtra por usuário,
+        # se não for,filtra pelos chamados do próprio usuário.
         only_created_by = None if is_admin(user) else user.id
         return await self.tickets.search(filters, only_created_by)
 
@@ -48,6 +54,8 @@ class TicketService:
         ticket = await self.get(user, ticket_id)
         ensure_can_edit(user, ticket)
 
+        # Método do Pydantic que retorna um dicionário com os campos definidos no modelo,
+        # excluindo os que não foram alterados, muito útil para patch.
         values = data.model_dump(exclude_unset=True)
         if not await self.tickets.update_if_status(ticket.id, TicketStatus.OPEN, values):
             raise TicketChangedConcurrentlyError()
