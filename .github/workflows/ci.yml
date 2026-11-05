@@ -1,0 +1,62 @@
+
+name: CI - FastAPI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Lint e Testes
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: Chamados/backend
+
+    services:
+      postgres:
+        image: postgres:17.6-bookworm
+        env:
+          POSTGRES_USER: chamados
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: chamados
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chamados -d chamados"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://chamados:test-password@localhost:5432/chamados
+      TEST_DATABASE_URL: postgresql+asyncpg://chamados:test-password@localhost:5432/chamados_test
+      JWT_SECRET_KEY: ci-only-secret-key-with-at-least-32-characters
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --group dev
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format
+        run: uv run ruff format --check .
+
+      - name: Pytest
+        run: uv run pytest -q
+
+      - name: Docker build
+        working-directory: .
+        run: docker build -t chamados-api:ci ./Chamados/backend
