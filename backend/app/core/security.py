@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -5,8 +7,6 @@ from pwdlib import PasswordHash
 
 from app.core.config import get_settings
 from app.core.exceptions import AuthenticationError
-import hashlib
-import secrets
 
 # Argon2id com os parâmetros recomendados pela pwdlib.
 password_hasher = PasswordHash.recommended()

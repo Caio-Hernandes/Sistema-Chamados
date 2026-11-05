@@ -15,7 +15,6 @@ from app.core.exceptions import AuthenticationError
 from app.dependencies import AuthServiceDep
 from app.modules.auth.schemas import Token
 
-
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 REFRESH_COOKIE_NAME = "refresh_token"

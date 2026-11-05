@@ -6,13 +6,10 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import SessionLocal
-
 from app.modules.auth.repository import RefreshTokenRepository
 from app.modules.auth.service import AuthService
-
 from app.modules.tickets.repository import TicketRepository
 from app.modules.tickets.service import TicketService
-
 from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
 from app.modules.users.service import UserService

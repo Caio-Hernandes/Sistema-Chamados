@@ -8,11 +8,8 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
-import app.modules.tickets.models
-import app.modules.users.models
 from app.core.config import get_settings
 from app.db.base import Base
-from app.modules.auth.models import RefreshToken
 
 config = context.config
 if config.config_file_name is not None:

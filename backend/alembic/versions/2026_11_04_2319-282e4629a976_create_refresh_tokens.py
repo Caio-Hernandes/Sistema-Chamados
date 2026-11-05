@@ -8,10 +8,6 @@ Create Date: 2026-11-04 23:19:45.920915
 
 from collections.abc import Sequence
 
-from alembic import op
-import sqlalchemy as sa
-
-
 # revision identifiers, used by Alembic.
 revision: str = "282e4629a976"
 down_revision: str | Sequence[str] | None = "60dff9675e75"
