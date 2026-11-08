@@ -15,6 +15,10 @@ from app.modules.users.repository import UserRepository
 from app.modules.users.service import UserService
 
 
+#comentário meu mesmo pra me lembrar da injeção de dependência
+#tem as funções, e os tipos com o Annotated, quando alguma tipo é definido aqui
+#o FastAPI injeta a dependência automaticamente por causa do Depends.
+
 async def get_session() -> AsyncIterator[AsyncSession]:
     async with SessionLocal() as session:
         yield session

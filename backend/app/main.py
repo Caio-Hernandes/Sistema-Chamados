@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,11 +13,12 @@ from app.modules.users.bootstrap import create_first_admin
 from app.modules.users.router import router as users_router
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+@asynccontextmanager #cria um gerenciador de contexto assíncrono para o ciclo de vida do FastAPI
+async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
+    #tipo de valor retornado é um gerador assíncrono que não produz valores (None) e não recebe valores (None)
     await create_first_admin()
     yield
-    await engine.dispose()
+    await engine.dispose() # engine é o objeto de conexão com o db do SQLAlchemy, dispose libera o pool
 
 
 app = FastAPI(title=get_settings().app_name, version="0.1.0", lifespan=lifespan)
