@@ -31,7 +31,9 @@ export interface Ticket {
   category: TicketCategory;
   status: TicketStatus;
   created_by_id: number;
+  created_by_name: string;
   assigned_to_id: number | null;
+  assigned_to_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -72,5 +74,6 @@ export interface TicketEvent {
   from_status: TicketStatus;
   to_status: TicketStatus;
   actor_id: number;
+  actor_name: string;
   created_at: string;
 }

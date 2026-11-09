@@ -70,7 +70,9 @@ class TicketRead(BaseModel):
     category: TicketCategory
     status: TicketStatus
     created_by_id: int
+    created_by_name: str
     assigned_to_id: int | None
+    assigned_to_name: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -92,4 +94,5 @@ class TicketEventRead(BaseModel):
     from_status: TicketStatus
     to_status: TicketStatus
     actor_id: int
+    actor_name: str
     created_at: datetime

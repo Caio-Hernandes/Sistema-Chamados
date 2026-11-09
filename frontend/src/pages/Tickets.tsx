@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import styled from "styled-components";
 
+import StatusBadge from "../components/StatusBadge";
+import FilterSelect from "../components/FilterSelect";
 import { useAuth } from "../contexts/AuthContext";
 import { createTicketService } from "../services/ticketService";
 
@@ -109,39 +111,22 @@ export default function Tickets() {
 
       <Filters>
         <FilterField>
-          <label htmlFor="status">Status</label>
-          <Select
-            id="status"
-            value={status}
-            onChange={(event) =>
-              handleStatusChange(
-                event.target.value as StatusFilter
-              )
-            }
-          >
-            <option value="ALL">Todos</option>
-            <option value="OPEN">Aberto</option>
-            <option value="IN_PROGRESS">Em andamento</option>
-            <option value="RESOLVED">Resolvido</option>
-            <option value="CLOSED">Fechado</option>
-          </Select>
+          <label id="status-label" htmlFor="status">Status</label>
+          <FilterSelect<StatusFilter> id="status" value={status} onChange={handleStatusChange}
+            options={[
+              { value: "ALL", label: "Todos" },
+              ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value: value as TicketStatus, label })),
+            ]} />
         </FilterField>
 
         <FilterField>
-          <label htmlFor="sort">Ordenar por</label>
-          <Select
-            id="sort"
-            value={sortBy}
-            onChange={(event) =>
-              handleSortChange(
-                event.target.value as TicketSortField
-              )
-            }
-          >
-            <option value="created_at">Data de criação</option>
-            <option value="updated_at">Última atualização</option>
-            <option value="title">Título</option>
-          </Select>
+          <label id="sort-label" htmlFor="sort">Ordenar por</label>
+          <FilterSelect<TicketSortField> id="sort" value={sortBy} onChange={handleSortChange}
+            options={[
+              { value: "created_at", label: "Data de cria\u00e7\u00e3o" },
+              { value: "updated_at", label: "\u00daltima atualiza\u00e7\u00e3o" },
+              { value: "title", label: "T\u00edtulo" },
+            ]} />
         </FilterField>
 
         <RefreshButton
@@ -226,6 +211,7 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
 
       <TicketBottom>
         <Meta>
+          <span>Dono: {ticket.created_by_name || "Nome indisponível"}</span>
           <span>Categoria: {ticket.category}</span>
           <span>
             Criado em:{" "}
@@ -242,7 +228,7 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
 }
 
 const Container = styled.section`
-  max-width: 1200px;
+  max-width: var(--content-width);
   margin: 0 auto;
 `;
 
@@ -256,8 +242,8 @@ const PageHeader = styled.div`
 
   h1 {
     margin: 0 0 8px;
-    font-size: clamp(26px, 4vw, 36px);
-    font-weight: 900;
+    font-size: clamp(26px, 3vw, 32px);
+    font-weight: 750;
   }
 
   p {
@@ -267,14 +253,18 @@ const PageHeader = styled.div`
 `;
 
 const CreateButton = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
   padding: 12px 18px;
-  border: 2px solid var(--border);
-  border-radius: 5px;
-  background: var(--input-bg);
-  color: var(--text);
-  box-shadow: 4px 4px 0 var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--accent-bg);
+  color: var(--focus);
+  box-shadow: var(--card-shadow);
   text-decoration: none;
-  font-weight: 800;
+  font-weight: 650;
 `;
 
 const Filters = styled.div`
@@ -282,14 +272,19 @@ const Filters = styled.div`
   align-items: flex-end;
   flex-wrap: wrap;
   gap: 18px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
 `;
 
 const FilterField = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 180px;
+  min-width: 0;
+  flex: 1 1 180px;
 
   label {
     font-size: 14px;
@@ -297,25 +292,14 @@ const FilterField = styled.div`
   }
 `;
 
-const Select = styled.select`
-  min-height: 44px;
-  padding: 10px;
-  border: 2px solid var(--border);
-  border-radius: 5px;
-  background: var(--input-bg);
-  color: var(--text);
-  box-shadow: 3px 3px 0 var(--border);
-  font-size: 14px;
-`;
-
 const RefreshButton = styled.button`
-  min-height: 44px;
+  min-height: 48px;
   padding: 10px 16px;
-  border: 2px solid var(--border);
-  border-radius: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   background: var(--card-bg);
   color: var(--text);
-  box-shadow: 3px 3px 0 var(--border);
+  box-shadow: var(--card-shadow);
   font-weight: 700;
   cursor: pointer;
 
@@ -327,15 +311,17 @@ const RefreshButton = styled.button`
 
 const TicketList = styled.div`
   display: grid;
-  gap: 18px;
+  gap: 20px;
 `;
 
 const TicketItem = styled.article`
+  transition: border-color 150ms;
+  &:hover { border-color: var(--accent-border); }
   padding: 24px;
-  border: 2px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
   background: var(--card-bg);
-  box-shadow: 4px 4px 0 var(--border);
+  box-shadow: var(--card-shadow);
 
   h2 {
     margin: 14px 0 8px;
@@ -353,29 +339,8 @@ const TicketTop = styled.div`
 
 const TicketId = styled.span`
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--muted);
-`;
-
-const StatusBadge = styled.span<{ $status: TicketStatus }>`
-  padding: 6px 10px;
-  border: 2px solid var(--border);
-  border-radius: 5px;
-  font-size: 12px;
-  font-weight: 800;
-  background: ${({ $status }) => {
-    switch ($status) {
-      case "OPEN":
-        return "#FDE68A";
-      case "IN_PROGRESS":
-        return "#BFDBFE";
-      case "RESOLVED":
-        return "#BBF7D0";
-      case "CLOSED":
-        return "#D1D5DB";
-    }
-  }};
-  color: #171717;
 `;
 
 const Description = styled.p`
@@ -409,8 +374,9 @@ const Meta = styled.div`
 
 const DetailsLink = styled(Link)`
   color: var(--text);
-  font-weight: 800;
-  text-decoration: underline;
+  font-weight: 650;
+  text-decoration: none;
+  color: var(--focus);
 `;
 
 const Pagination = styled.div`
@@ -432,8 +398,8 @@ const PageControls = styled.div`
 
 const PageButton = styled.button`
   padding: 10px 14px;
-  border: 2px solid var(--border);
-  border-radius: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   background: var(--input-bg);
   color: var(--text);
   font-weight: 700;
@@ -447,15 +413,15 @@ const PageButton = styled.button`
 
 const Feedback = styled.p`
   padding: 20px;
-  border: 2px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   background: var(--card-bg);
 `;
 
 const EmptyState = styled.div`
   padding: 40px 24px;
   border: 2px dashed var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   text-align: center;
 
   h2 {

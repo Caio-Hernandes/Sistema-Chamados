@@ -1,16 +1,49 @@
 
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import styled from "styled-components";
 
+import Icon from "../components/Icon";
 import { useAuth } from "../contexts/AuthContext";
+import { createTicketService } from "../services/ticketService";
+import type { TicketStatus } from "../types/ticket";
+
+const STATUSES: { status: TicketStatus; label: string }[] = [
+  { status: "OPEN", label: "Abertos" },
+  { status: "IN_PROGRESS", label: "Em andamento" },
+  { status: "RESOLVED", label: "Resolvidos" },
+  { status: "CLOSED", label: "Fechados" },
+];
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, authRequest } = useAuth();
+  const [counts, setCounts] = useState<number[] | null>(null);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const service = createTicketService(authRequest);
+    async function load() {
+      setCounts(null);
+      setError(false);
+      try {
+        const results = await Promise.all(STATUSES.map(({ status }) =>
+          service.list({ status, limit: 1 })
+        ));
+        if (!cancelled) setCounts(results.map(result => result.total));
+      } catch {
+        if (!cancelled) setError(true);
+      }
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, [authRequest, reloadKey]);
 
   return (
     <Container>
       <Heading>
-        <h1>Olá, {user?.name?.split(" ")[0]}!</h1>
+        <h1>Olá, {user?.role === "ADMIN" ? "Administrador" : user?.name?.split(" ")[0]}!</h1>
         <p>Bem-vindo ao seu painel de chamados.</p>
       </Heading>
 
@@ -18,7 +51,7 @@ export default function Dashboard() {
 
       <Cards>
         <ActionCard to="/tickets">
-          <CardIcon>☷</CardIcon>
+          <CardIcon><Icon name="tickets" /></CardIcon>
           <h2>Meus chamados</h2>
           <p>
             Consulte seus chamados e acompanhe o andamento
@@ -28,7 +61,7 @@ export default function Dashboard() {
         </ActionCard>
 
         <ActionCard to="/tickets/new">
-          <CardIcon>+</CardIcon>
+          <CardIcon><Icon name="plus" /></CardIcon>
           <h2>Abrir chamado</h2>
           <p>
             Registre uma nova solicitação para a equipe
@@ -40,49 +73,35 @@ export default function Dashboard() {
 
       <SectionTitle>Resumo dos chamados</SectionTitle>
 
-      <StatsGrid>
-        <StatCard>
-          <span>Abertos</span>
-          <strong>—</strong>
-        </StatCard>
-
-        <StatCard>
-          <span>Em andamento</span>
-          <strong>—</strong>
-        </StatCard>
-
-        <StatCard>
-          <span>Resolvidos</span>
-          <strong>—</strong>
-        </StatCard>
-
-        <StatCard>
-          <span>Fechados</span>
-          <strong>—</strong>
-        </StatCard>
+      <StatsGrid aria-busy={!counts && !error}>
+        {STATUSES.map(({ status, label }, index) => <StatCard key={status}>
+          <span>{label}</span>
+          <strong>{counts ? counts[index].toLocaleString("pt-BR") : "—"}</strong>
+        </StatCard>)}
       </StatsGrid>
 
-      <Note>
-        As estatísticas serão exibidas quando integrarmos
-        os endpoints de chamados.
-      </Note>
+      {error ? <Note role="alert">
+        Não foi possível carregar o resumo. <RetryButton type="button"
+          onClick={() => setReloadKey(value => value + 1)}>Tentar novamente</RetryButton>
+      </Note> : !counts ? <Note role="status">Carregando resumo...</Note> :
+        <Note>{user?.role === "ADMIN" ? "Resumo de todos os chamados." : "Resumo dos seus chamados."}</Note>}
     </Container>
   );
 }
 
 const Container = styled.div`
   width: 100%;
-  max-width: 1200px;
+  max-width: var(--content-width);
   margin: 0 auto;
 `;
 
 const Heading = styled.div`
-  margin-bottom: 36px;
+  margin-bottom: 32px;
 
   h1 {
     margin: 0 0 8px;
-    font-size: clamp(26px, 4vw, 36px);
-    font-weight: 900;
+    font-size: clamp(26px, 3vw, 32px);
+    font-weight: 750;
   }
 
   p {
@@ -93,14 +112,14 @@ const Heading = styled.div`
 
 const SectionTitle = styled.h2`
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 650;
   margin: 32px 0 20px;
 `;
 
 const Cards = styled.div`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
+  gap: 20px;
 
   @media (max-width: 700px) {
     grid-template-columns: 1fr;
@@ -108,13 +127,13 @@ const Cards = styled.div`
 `;
 
 const ActionCard = styled(Link)`
-  padding: 26px;
-  border: 2px solid var(--border);
-  border-radius: 8px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
 
   background: var(--card-bg);
   color: var(--text);
-  box-shadow: 5px 5px 0 var(--border);
+  box-shadow: var(--card-shadow);
 
   text-decoration: none;
 
@@ -123,8 +142,8 @@ const ActionCard = styled(Link)`
   align-items: flex-start;
 
   &:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: 7px 7px 0 var(--border);
+    border-color: var(--focus);
+    background: var(--hover-bg);
   }
 
   h2 {
@@ -140,30 +159,31 @@ const ActionCard = styled(Link)`
 `;
 
 const CardIcon = styled.div`
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
 
   display: grid;
   place-items: center;
 
-  border: 2px solid var(--border);
-  border-radius: 5px;
-  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--accent-bg);
+  color: var(--focus);
 
   font-size: 26px;
-  font-weight: 900;
+  font-weight: 750;
 `;
 
 const CardAction = styled.span`
   margin-top: auto;
-  font-weight: 800;
-  text-decoration: underline;
+  font-weight: 650;
+  color: var(--focus);
 `;
 
 const StatsGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
+  gap: 20px;
 
   @media (max-width: 900px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -175,11 +195,11 @@ const StatsGrid = styled.div`
 `;
 
 const StatCard = styled.div`
-  padding: 22px;
+  padding: 24px;
   background: var(--card-bg);
-  border: 2px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 4px 4px 0 var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
 
   display: flex;
   flex-direction: column;
@@ -191,8 +211,8 @@ const StatCard = styled.div`
   }
 
   strong {
-    font-size: 32px;
-    font-weight: 900;
+    font-size: clamp(26px, 3vw, 32px);
+    font-weight: 750;
   }
 `;
 
@@ -200,4 +220,14 @@ const Note = styled.p`
   margin-top: 20px;
   font-size: 13px;
   color: var(--muted);
+`;
+
+const RetryButton = styled.button`
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--focus);
+  font-weight: 650;
+  text-decoration: underline;
+  cursor: pointer;
 `;

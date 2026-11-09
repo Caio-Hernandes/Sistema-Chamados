@@ -1,10 +1,11 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, String, Text, case, func, select
+from sqlalchemy.orm import Mapped, column_property, mapped_column
 
 from app.db.base import Base
+from app.modules.users.models import User, UserRole
 
 
 class TicketStatus(StrEnum):
@@ -53,7 +54,19 @@ class Ticket(Base):
         index=True,
     )
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_by_name: Mapped[str] = column_property(
+        select(case((User.role == UserRole.ADMIN, "Admin"), else_=User.name))
+        .where(User.id == created_by_id)
+        .correlate_except(User)
+        .scalar_subquery()
+    )
     assigned_to_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
+    assigned_to_name: Mapped[str | None] = column_property(
+        select(case((User.role == UserRole.ADMIN, "Admin"), else_=User.name))
+        .where(User.id == assigned_to_id)
+        .correlate_except(User)
+        .scalar_subquery()
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -68,6 +81,12 @@ class TicketEvent(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
     actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    actor_name: Mapped[str] = column_property(
+        select(case((User.role == UserRole.ADMIN, "Admin"), else_=User.name))
+        .where(User.id == actor_id)
+        .correlate_except(User)
+        .scalar_subquery()
+    )
     action: Mapped[TicketAction] = mapped_column(string_enum(TicketAction, "ticket_action"))
     from_status: Mapped[TicketStatus] = mapped_column(string_enum(TicketStatus, "from_status"))
     to_status: Mapped[TicketStatus] = mapped_column(string_enum(TicketStatus, "to_status"))

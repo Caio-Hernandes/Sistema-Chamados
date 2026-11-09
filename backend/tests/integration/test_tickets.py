@@ -43,7 +43,29 @@ async def test_create_ticket(client: AsyncClient, user: ApiUser) -> None:
 
     assert ticket["status"] == "OPEN"
     assert ticket["created_by_id"] == user.id
+    assert ticket["created_by_name"] == "User"
     assert ticket["assigned_to_id"] is None
+    assert ticket["assigned_to_name"] is None
+
+
+async def test_ticket_names_use_registration_name_and_admin_label(
+    client: AsyncClient, make_user: MakeUser
+) -> None:
+    owner = await make_user("maria@example.com", name="Maria Silva")
+    admin = await make_user("support@example.com", UserRole.ADMIN, name="Support Operator")
+    ticket = await create_ticket(client, owner)
+    assert ticket["created_by_name"] == "Maria Silva"
+
+    response = await client.post(f"/tickets/{ticket['id']}/assign", headers=admin.headers)
+    assert response.status_code == 200
+    assert response.json()["created_by_name"] == "Maria Silva"
+    assert response.json()["assigned_to_name"] == "Admin"
+
+    history = await client.get(f"/tickets/{ticket['id']}/history", headers=owner.headers)
+    assert history.json()[0]["actor_name"] == "Admin"
+
+    admin_ticket = await create_ticket(client, admin)
+    assert admin_ticket["created_by_name"] == "Admin"
 
 
 async def test_create_ticket_validates_input_and_requires_auth(
@@ -80,6 +102,7 @@ async def test_user_only_sees_own_tickets_and_admin_sees_all(
     admin_list = await client.get("/tickets", headers=admin.headers)
 
     assert [t["id"] for t in user_list.json()["items"]] == [mine["id"]]
+    assert user_list.json()["items"][0]["created_by_name"] == "User"
     assert user_filtering_other.json()["total"] == 0
     assert other_ticket.status_code == 404
     assert admin_list.json()["total"] == 2
@@ -131,7 +154,10 @@ async def test_full_lifecycle_records_history(
     history = await client.get(f"/tickets/{ticket_id}/history", headers=user.headers)
 
     assert final.json()["status"] == "CLOSED"
+    assert final.json()["created_by_name"] == "User"
     assert final.json()["assigned_to_id"] == admin.id
+    assert final.json()["assigned_to_name"] == "Admin"
+    assert [e["actor_name"] for e in history.json()] == ["Admin", "Admin", "User", "Admin", "User"]
     assert [(e["action"], e["from_status"], e["to_status"]) for e in history.json()] == [
         ("ASSIGN", "OPEN", "IN_PROGRESS"),
         ("RESOLVE", "IN_PROGRESS", "RESOLVED"),

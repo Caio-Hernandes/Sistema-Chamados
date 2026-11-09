@@ -25,15 +25,15 @@ MakeUser = Callable[..., Awaitable[ApiUser]]
 def make_user(client: AsyncClient, sessionmaker: async_sessionmaker[AsyncSession]) -> MakeUser:
     """Cria um usuário (USER pelo cadastro público, ADMIN pelo service) e faz login."""
 
-    async def _make_user(email: str, role: UserRole = UserRole.USER) -> ApiUser:
+    async def _make_user(email: str, role: UserRole = UserRole.USER, name: str = "User") -> ApiUser:
         if role == UserRole.ADMIN:
             async with sessionmaker() as session:
                 await UserService(session=session, users=UserRepository(session)).ensure_admin(
-                    "Admin", email, PASSWORD
+                    name, email, PASSWORD
                 )
         else:
             response = await client.post(
-                "/users", json={"name": "User", "email": email, "password": PASSWORD}
+                "/users", json={"name": name, "email": email, "password": PASSWORD}
             )
             assert response.status_code == 201, response.text
 
