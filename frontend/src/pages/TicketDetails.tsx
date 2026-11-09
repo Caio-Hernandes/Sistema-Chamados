@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import styled from "styled-components";
 
@@ -26,236 +26,415 @@ const CATEGORY_LABELS: Record<TicketCategory, string> = {
   SOFTWARE: "Software",
   NETWORK: "Rede",
   ACCESS: "Acesso",
-  OTHER: "Outros",
+  OTHER: "Outro",
 };
 
+const ACTION_LABELS: Record<string, string> = {
+  ASSIGN: "Atribuído",
+  RESOLVE: "Resolvido",
+  CLOSE: "Fechado",
+  REOPEN: "Reaberto",
+};
+
+type TicketAction = "assign" | "resolve" | "close" | "reopen";
+
+type TicketData = {
+  id: number;
+  ticket: Ticket;
+  history: TicketEvent[];
+};
+
+function formatDate(date: string): string {
+  return new Date(date).toLocaleString("pt-BR");
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return error.message;
+  }
+
+  return "Não foi possível completar a operação.";
+}
+
 export default function TicketDetails() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
+
   const ticketId = Number(id);
+
+  const invalidTicketId =
+    !Number.isSafeInteger(ticketId) || ticketId <= 0;
 
   const { user, authRequest } = useAuth();
 
-  const service = useMemo(
+  const ticketService = useMemo(
     () => createTicketService(authRequest),
     [authRequest]
   );
 
-  const [ticket, setTicket] = useState<Ticket | null>(null);
-  const [history, setHistory] = useState<TicketEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [data, setData] = useState<TicketData | null>(null);
 
-  const loadTicket = useCallback(async () => {
-    const [ticketData, historyData] = await Promise.all([
-      service.get(ticketId),
-      service.history(ticketId),
-    ]);
+  const [loadError, setLoadError] = useState<{
+    id: number;
+    message: string;
+  } | null>(null);
 
-    setTicket(ticketData);
-    setHistory(historyData);
-  }, [service, ticketId]);
+  const [actionError, setActionError] = useState("");
+  const [processing, setProcessing] = useState<TicketAction | null>(
+    null
+  );
+
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
-
-    if (!Number.isSafeInteger(ticketId) || ticketId <= 0) {
-      setError("Identificador do chamado inválido.");
-      setLoading(false);
+    if (invalidTicketId) {
       return;
     }
 
-    async function load() {
-      setLoading(true);
-      setError("");
+    let cancelled = false;
 
+    async function loadTicket() {
       try {
-        const [ticketData, historyData] = await Promise.all([
-          service.get(ticketId),
-          service.history(ticketId),
+        const [ticket, history] = await Promise.all([
+          ticketService.get(ticketId),
+          ticketService.history(ticketId),
         ]);
 
-        if (!cancelled) {
-          setTicket(ticketData);
-          setHistory(historyData);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(getErrorMessage(err));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (cancelled) return;
+
+        setData({
+          id: ticketId,
+          ticket,
+          history,
+        });
+
+        setLoadError(null);
+      } catch (error) {
+        if (cancelled) return;
+
+        setData(null);
+
+        setLoadError({
+          id: ticketId,
+          message: getErrorMessage(error),
+        });
       }
     }
 
-    void load();
+    void loadTicket();
 
     return () => {
       cancelled = true;
     };
-  }, [service, ticketId]);
+  }, [
+    ticketService,
+    ticketId,
+    invalidTicketId,
+    reloadKey,
+  ]);
 
-  async function performAction(
-    action: "assign" | "resolve" | "close" | "reopen"
-  ) {
-    if (busy) return;
+  async function handleAction(action: TicketAction) {
+    if (invalidTicketId || processing) {
+      return;
+    }
 
-    setBusy(true);
-    setError("");
+    setProcessing(action);
+    setActionError("");
 
     try {
-      await service[action](ticketId);
-      await loadTicket();
-    } catch (err) {
-      setError(getErrorMessage(err));
+      switch (action) {
+        case "assign":
+          await ticketService.assign(ticketId);
+          break;
+
+        case "resolve":
+          await ticketService.resolve(ticketId);
+          break;
+
+        case "close":
+          await ticketService.close(ticketId);
+          break;
+
+        case "reopen":
+          await ticketService.reopen(ticketId);
+          break;
+      }
+
+      const [ticket, history] = await Promise.all([
+        ticketService.get(ticketId),
+        ticketService.history(ticketId),
+      ]);
+
+      setData({
+        id: ticketId,
+        ticket,
+        history,
+      });
+
+      setLoadError(null);
+    } catch (error) {
+      setActionError(getErrorMessage(error));
     } finally {
-      setBusy(false);
+      setProcessing(null);
     }
   }
 
-  if (loading) {
-    return <Feedback>Carregando chamado...</Feedback>;
-  }
-
-  if (!ticket) {
+  if (invalidTicketId) {
     return (
       <Container>
+        <BackLink to="/tickets">
+          ← Voltar aos chamados
+        </BackLink>
+
         <Feedback role="alert">
-          {error || "Chamado não encontrado."}
+          Identificador do chamado inválido.
         </Feedback>
-        <BackLink to="/tickets">← Voltar aos chamados</BackLink>
       </Container>
     );
   }
 
+  const currentData =
+    data?.id === ticketId ? data : null;
+
+  const currentError =
+    loadError?.id === ticketId
+      ? loadError.message
+      : null;
+
+  if (!currentData && !currentError) {
+    return (
+      <Container>
+        <Feedback role="status">
+          Carregando chamado...
+        </Feedback>
+      </Container>
+    );
+  }
+
+  if (currentError || !currentData) {
+    return (
+      <Container>
+        <BackLink to="/tickets">
+          ← Voltar aos chamados
+        </BackLink>
+
+        <Feedback role="alert">
+          {currentError ?? "Chamado não encontrado."}
+        </Feedback>
+
+        <ActionButton
+          type="button"
+          onClick={() => {
+            setLoadError(null);
+            setReloadKey((value) => value + 1);
+          }}
+        >
+          Tentar novamente
+        </ActionButton>
+      </Container>
+    );
+  }
+
+  const { ticket, history } = currentData;
+
   const isAdmin = user?.role === "ADMIN";
   const isCreator = user?.id === ticket.created_by_id;
+
   const isAssignedAdmin =
     isAdmin && user?.id === ticket.assigned_to_id;
 
+  const canAssign =
+    isAdmin && ticket.status === "OPEN";
+
+  const canResolve =
+    isAssignedAdmin && ticket.status === "IN_PROGRESS";
+
+  const canClose =
+    (isCreator || isAdmin) &&
+    ticket.status === "RESOLVED";
+
+  const canReopen =
+    isCreator && ticket.status === "RESOLVED";
+
   return (
     <Container>
+      <BackLink to="/tickets">
+        ← Voltar aos chamados
+      </BackLink>
+
       <Header>
         <div>
-          <BackLink to="/tickets">← Voltar aos chamados</BackLink>
-          <h1>Chamado #{ticket.id}</h1>
-          <p>Acompanhe os detalhes da solicitação.</p>
+          <SmallText>Chamado #{ticket.id}</SmallText>
+          <h1>{ticket.title}</h1>
         </div>
 
-        <StatusBadge>{STATUS_LABELS[ticket.status]}</StatusBadge>
+        <StatusBadge>
+          {STATUS_LABELS[ticket.status]}
+        </StatusBadge>
       </Header>
 
-      {error && <Feedback role="alert">{error}</Feedback>}
-
       <Card>
-        <h2>{ticket.title}</h2>
+        <SectionTitle>
+          Informações do chamado
+        </SectionTitle>
 
-        <Metadata>
-          <span>
-            <strong>Categoria:</strong>{" "}
-            {CATEGORY_LABELS[ticket.category]}
-          </span>
+        <DetailsGrid>
+          <Info>
+            <strong>Categoria</strong>
+            <span>
+              {CATEGORY_LABELS[ticket.category]}
+            </span>
+          </Info>
 
-          <span>
-            <strong>Criado por:</strong> Usuário #{ticket.created_by_id}
-          </span>
+          <Info>
+            <strong>Status</strong>
+            <span>
+              {STATUS_LABELS[ticket.status]}
+            </span>
+          </Info>
 
-          <span>
-            <strong>Responsável:</strong>{" "}
-            {ticket.assigned_to_id
-              ? `Usuário #${ticket.assigned_to_id}`
-              : "Não atribuído"}
-          </span>
+          <Info>
+            <strong>Criado por</strong>
+            <span>
+              Usuário #{ticket.created_by_id}
+            </span>
+          </Info>
 
-          <span>
-            <strong>Criado em:</strong>{" "}
-            {formatDate(ticket.created_at)}
-          </span>
+          <Info>
+            <strong>Responsável</strong>
+            <span>
+              {ticket.assigned_to_id
+                ? `Usuário #${ticket.assigned_to_id}`
+                : "Não atribuído"}
+            </span>
+          </Info>
 
-          <span>
-            <strong>Atualizado em:</strong>{" "}
-            {formatDate(ticket.updated_at)}
-          </span>
-        </Metadata>
+          <Info>
+            <strong>Criado em</strong>
+            <span>
+              {formatDate(ticket.created_at)}
+            </span>
+          </Info>
 
-        <Divider />
+          <Info>
+            <strong>Atualizado em</strong>
+            <span>
+              {formatDate(ticket.updated_at)}
+            </span>
+          </Info>
+        </DetailsGrid>
 
-        <h3>Descrição</h3>
-        <Description>{ticket.description}</Description>
+        <SectionTitle>Descrição</SectionTitle>
+
+        <Description>
+          {ticket.description}
+        </Description>
       </Card>
 
+      {(canAssign ||
+        canResolve ||
+        canClose ||
+        canReopen) && (
+        <Card>
+          <SectionTitle>
+            Ações disponíveis
+          </SectionTitle>
+
+          <Actions>
+            {canAssign && (
+              <ActionButton
+                type="button"
+                disabled={processing !== null}
+                onClick={() =>
+                  void handleAction("assign")
+                }
+              >
+                {processing === "assign"
+                  ? "Atribuindo..."
+                  : "Assumir chamado"}
+              </ActionButton>
+            )}
+
+            {canResolve && (
+              <ActionButton
+                type="button"
+                disabled={processing !== null}
+                onClick={() =>
+                  void handleAction("resolve")
+                }
+              >
+                {processing === "resolve"
+                  ? "Resolvendo..."
+                  : "Resolver chamado"}
+              </ActionButton>
+            )}
+
+            {canClose && (
+              <ActionButton
+                type="button"
+                disabled={processing !== null}
+                onClick={() =>
+                  void handleAction("close")
+                }
+              >
+                {processing === "close"
+                  ? "Fechando..."
+                  : "Fechar chamado"}
+              </ActionButton>
+            )}
+
+            {canReopen && (
+              <ActionButton
+                type="button"
+                disabled={processing !== null}
+                onClick={() =>
+                  void handleAction("reopen")
+                }
+              >
+                {processing === "reopen"
+                  ? "Reabrindo..."
+                  : "Reabrir chamado"}
+              </ActionButton>
+            )}
+          </Actions>
+
+          {actionError && (
+            <Feedback role="alert">
+              {actionError}
+            </Feedback>
+          )}
+        </Card>
+      )}
+
       <Card>
-        <h2>Ações</h2>
-
-        <Actions>
-          {isAdmin && ticket.status === "OPEN" && (
-            <ActionButton
-              disabled={busy}
-              onClick={() => performAction("assign")}
-            >
-              Assumir chamado
-            </ActionButton>
-          )}
-
-          {isAssignedAdmin && ticket.status === "IN_PROGRESS" && (
-            <ActionButton
-              disabled={busy}
-              onClick={() => performAction("resolve")}
-            >
-              Resolver chamado
-            </ActionButton>
-          )}
-
-          {(isCreator || isAdmin) && ticket.status === "RESOLVED" && (
-            <ActionButton
-              disabled={busy}
-              onClick={() => performAction("close")}
-            >
-              Encerrar chamado
-            </ActionButton>
-          )}
-
-          {isCreator && ticket.status === "RESOLVED" && (
-            <ActionButton
-              disabled={busy}
-              onClick={() => performAction("reopen")}
-            >
-              Reabrir chamado
-            </ActionButton>
-          )}
-
-          {isCreator && ticket.status === "OPEN" && (
-            <Hint>
-              Você pode editar este chamado enquanto estiver aberto.
-            </Hint>
-          )}
-
-          {ticket.status === "CLOSED" && (
-            <Hint>Este chamado está encerrado.</Hint>
-          )}
-        </Actions>
-      </Card>
-
-      <Card>
-        <h2>Histórico</h2>
+        <SectionTitle>
+          Histórico do chamado
+        </SectionTitle>
 
         {history.length === 0 ? (
-          <Hint>Nenhuma alteração de status registrada.</Hint>
+          <SmallText>
+            Nenhuma movimentação registrada.
+          </SmallText>
         ) : (
           <HistoryList>
             {history.map((event) => (
               <HistoryItem key={event.id}>
-                <strong>{event.action}</strong>
+                <strong>
+                  {ACTION_LABELS[event.action] ??
+                    event.action}
+                </strong>
+
                 <span>
-                  {STATUS_LABELS[event.from_status]} →{" "}
+                  {event.from_status
+                    ? STATUS_LABELS[event.from_status]
+                    : "Sem status anterior"}
+                  {" → "}
                   {STATUS_LABELS[event.to_status]}
                 </span>
-                <small>
-                  Usuário #{event.actor_id} —{" "}
+
+                <SmallText>
+                  Usuário #{event.actor_id} •{" "}
                   {formatDate(event.created_at)}
-                </small>
+                </SmallText>
               </HistoryItem>
             ))}
           </HistoryList>
@@ -265,103 +444,85 @@ export default function TicketDetails() {
   );
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleString("pt-BR");
-}
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof ApiError) {
-    if (error.status === 403) {
-      return "Você não tem permissão para realizar esta ação.";
-    }
-
-    if (error.status === 404) {
-      return "Chamado não encontrado.";
-    }
-
-    if (error.status === 409) {
-      return "Esta ação não é permitida no status atual.";
-    }
-
-    return error.message;
-  }
-
-  return "Não foi possível completar a operação.";
-}
-
-const Container = styled.section`
-  max-width: 1000px;
+const Container = styled.main`
+  max-width: 1100px;
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  padding: 32px 24px;
+  color: var(--text);
+`;
+
+const BackLink = styled(Link)`
+  display: inline-block;
+  margin-bottom: 24px;
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 `;
 
 const Header = styled.header`
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  align-items: flex-start;
   flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 28px;
 
   h1 {
-    margin: 16px 0 8px;
-    font-size: clamp(26px, 4vw, 36px);
-    font-weight: 900;
-  }
-
-  p {
-    margin: 0;
-    color: var(--muted);
-  }
-`;
-
-const BackLink = styled(Link)`
-  color: var(--text);
-  font-weight: 700;
-`;
-
-const Card = styled.section`
-  padding: 28px;
-  border: 2px solid var(--border);
-  border-radius: 8px;
-  background: var(--card-bg);
-  box-shadow: 5px 5px 0 var(--border);
-
-  h2 {
-    margin: 0 0 24px;
-    font-size: 22px;
-  }
-
-  h3 {
-    font-size: 16px;
+    margin: 8px 0 0;
+    font-size: clamp(24px, 4vw, 32px);
   }
 `;
 
 const StatusBadge = styled.span`
-  padding: 10px 16px;
+  padding: 8px 14px;
   border: 2px solid var(--border);
   border-radius: 6px;
   background: var(--input-bg);
   box-shadow: 3px 3px 0 var(--border);
-  font-weight: 800;
+  font-weight: 700;
 `;
 
-const Metadata = styled.div`
+const Card = styled.section`
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  box-shadow: 5px 5px 0 var(--border);
+`;
+
+const SectionTitle = styled.h2`
+  margin: 0 0 20px;
+  font-size: 20px;
+`;
+
+const DetailsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(180px, 1fr)
+  );
+  gap: 20px;
+  margin-bottom: 28px;
+`;
+
+const Info = styled.div`
   display: flex;
-  flex-wrap: wrap;
-  gap: 14px 24px;
-  font-size: 14px;
-  color: var(--text);
-`;
+  flex-direction: column;
+  gap: 6px;
 
-const Divider = styled.hr`
-  border: none;
-  border-top: 2px solid var(--border);
-  margin: 28px 0;
+  strong {
+    font-size: 13px;
+    color: var(--muted);
+  }
 `;
 
 const Description = styled.p`
+  margin: 0;
   line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -369,55 +530,57 @@ const Description = styled.p`
 
 const Actions = styled.div`
   display: flex;
-  gap: 12px;
   flex-wrap: wrap;
+  gap: 12px;
 `;
 
 const ActionButton = styled.button`
   padding: 12px 18px;
   border: 2px solid var(--border);
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--input-bg);
   color: var(--text);
   box-shadow: 3px 3px 0 var(--border);
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
-`;
 
-const HistoryList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-`;
-
-const HistoryItem = styled.div`
-  padding: 14px;
-  border: 2px solid var(--border);
-  border-radius: 5px;
-  background: var(--input-bg);
-
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-
-  small {
-    color: var(--muted);
+  &:active:not(:disabled) {
+    transform: translate(3px, 3px);
+    box-shadow: none;
   }
 `;
 
-const Hint = styled.p`
+const HistoryList = styled.ul`
+  list-style: none;
+  padding: 0;
   margin: 0;
+`;
+
+const HistoryItem = styled.li`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const SmallText = styled.p`
+  margin: 0;
+  font-size: 13px;
   color: var(--muted);
-  font-size: 14px;
 `;
 
 const Feedback = styled.p`
-  padding: 18px;
+  padding: 16px;
   border: 2px solid var(--border);
   border-radius: 6px;
   background: var(--card-bg);

@@ -1,3 +1,4 @@
+
 import {
   createContext,
   useContext,
@@ -8,35 +9,45 @@ import {
 
 type Theme = "light" | "dark";
 
-type ThemeContextType = {
+interface ThemeContextType {
   theme: Theme;
   toggleTheme: () => void;
-};
-
-const ThemeContext = createContext<ThemeContextType | null>(null);
-
-function getInitialTheme(): Theme {
-  const saved = localStorage.getItem("theme");
-
-  if (saved === "light" || saved === "dark") {
-    return saved;
-  }
-
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+const ThemeContext = createContext<
+  ThemeContextType | undefined
+>(undefined);
+
+function getInitialTheme(): Theme {
+  const savedTheme = localStorage.getItem("theme");
+
+  if (savedTheme === "light" || savedTheme === "dark") {
+    return savedTheme;
+  }
+
+  return "light";
+}
+
+export function ThemeProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    document.documentElement.setAttribute(
+      "data-theme",
+      theme
+    );
+
     localStorage.setItem("theme", theme);
   }, [theme]);
 
   function toggleTheme() {
-    setTheme((current) => (current === "light" ? "dark" : "light"));
+    setTheme((current) =>
+      current === "light" ? "dark" : "light"
+    );
   }
 
   return (
@@ -46,11 +57,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useTheme() {
+export function useTheme(): ThemeContextType {
   const context = useContext(ThemeContext);
 
   if (!context) {
-    throw new Error("useTheme precisa estar dentro do ThemeProvider");
+    throw new Error(
+      "useTheme deve ser usado dentro de ThemeProvider."
+    );
   }
 
   return context;
