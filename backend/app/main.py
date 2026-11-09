@@ -2,6 +2,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.error_handlers import register_exception_handlers
@@ -11,7 +12,6 @@ from app.modules.health.router import router as health_router
 from app.modules.tickets.router import router as tickets_router
 from app.modules.users.bootstrap import create_first_admin
 from app.modules.users.router import router as users_router
-from fastapi.middleware.cors import CORSMiddleware
 
 
 @asynccontextmanager
