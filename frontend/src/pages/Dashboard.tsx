@@ -201,6 +201,3 @@ const Note = styled.p`
   font-size: 13px;
   color: var(--muted);
 `;
-export default function Dashboard() {
-  return <h1>Dashboard de Chamados</h1>;
-}

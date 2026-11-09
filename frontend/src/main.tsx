@@ -5,7 +5,6 @@ import App from "./App";
 
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
-import { ThemeProvider } from "./contexts/ThemeContext";
 import { GlobalStyle } from "./styles/GlobalStyle";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

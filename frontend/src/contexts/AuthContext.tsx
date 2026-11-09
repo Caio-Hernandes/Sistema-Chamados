@@ -1,3 +1,4 @@
+
 import {
   createContext,
   useCallback,
@@ -5,19 +6,18 @@ import {
   useEffect,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 
-import type { ReactNode } from "react";
-
-import { apiRequest, ApiError } from "../services/api";
 import { authService } from "../services/authService";
 import { userService } from "../services/userService";
+import { apiRequest, ApiError } from "../services/api";
 
-import type { LoginCredentials } from "../types/auth";
-import type { UserRead } from "../types/user";
+type User = Awaited<ReturnType<typeof userService.me>>;
+type LoginCredentials = Parameters<typeof authService.login>[0];
 
 interface AuthContextType {
-  user: UserRead | null;
+  user: User | null;
   loading: boolean;
   isAuthenticated: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
@@ -28,7 +28,9 @@ interface AuthContextType {
   ) => Promise<T>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | undefined>(
+  undefined
+);
 
 function withBearer(
   options: RequestInit,
@@ -49,7 +51,7 @@ export function AuthProvider({
 }: {
   children: ReactNode;
 }) {
-  const [user, setUser] = useState<UserRead | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const tokenRef = useRef<string | null>(null);
@@ -65,7 +67,10 @@ export function AuthProvider({
     async function restoreSession() {
       try {
         const tokens = await authService.refresh();
-        const currentUser = await userService.me(tokens.access_token);
+
+        const currentUser = await userService.me(
+          tokens.access_token
+        );
 
         if (!cancelled) {
           tokenRef.current = tokens.access_token;
@@ -96,7 +101,10 @@ export function AuthProvider({
       tokenRef.current = tokens.access_token;
 
       try {
-        const currentUser = await userService.me(tokens.access_token);
+        const currentUser = await userService.me(
+          tokens.access_token
+        );
+
         setUser(currentUser);
       } catch (error) {
         clearSession();
@@ -111,54 +119,50 @@ export function AuthProvider({
     clearSession();
   }, [clearSession]);
 
- 
-const authRequest = useCallback(
-  async <T,>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> => {
-    const token = tokenRef.current;
+  const authRequest = useCallback(
+    async <T,>(
+      endpoint: string,
+      options: RequestInit = {}
+    ): Promise<T> => {
+      const token = tokenRef.current;
 
-    if (!token) {
-      throw new Error("Usuário não autenticado.");
-    }
+      if (!token) {
+        throw new Error("Usuário não autenticado.");
+      }
 
-    try {
-      return await apiRequest<T>(
-        endpoint,
-        withBearer(options, token)
-      );
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 401) {
+      try {
+        return await apiRequest<T>(
+          endpoint,
+          withBearer(options, token)
+        );
+      } catch (error) {
+        if (
+          !(error instanceof ApiError) ||
+          error.status !== 401
+        ) {
+          throw error;
+        }
+      }
+
+      let newToken: string;
+
+      try {
+        const tokens = await authService.refresh();
+
+        newToken = tokens.access_token;
+        tokenRef.current = newToken;
+      } catch (error) {
+        clearSession();
         throw error;
       }
-    }
 
-    // O access token pode ter expirado.
-    // Tentamos renovar a sessão.
-    let newToken: string;
-
-    try {
-      const tokens = await authService.refresh();
-
-      newToken = tokens.access_token;
-      tokenRef.current = newToken;
-    } catch (error) {
-      // Só limpa a sessão se o refresh falhar.
-      clearSession();
-      throw error;
-    }
-
-    // Repete a requisição com o token renovado.
-    // Um erro aqui não será confundido com falha do refresh.
-    return apiRequest<T>(
-      endpoint,
-      withBearer(options, newToken)
-    );
-  },
-  [clearSession]
-);
-
+      return apiRequest<T>(
+        endpoint,
+        withBearer(options, newToken)
+      );
+    },
+    [clearSession]
+  );
 
   return (
     <AuthContext.Provider
@@ -176,11 +180,13 @@ const authRequest = useCallback(
   );
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error("useAuth deve ser usado dentro de AuthProvider.");
+    throw new Error(
+      "useAuth deve ser usado dentro de AuthProvider."
+    );
   }
 
   return context;

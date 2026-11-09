@@ -7,10 +7,6 @@ import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
 import { userService } from "../services/userService";
 import { ApiError } from "../services/api";
-import { useState, type FormEvent } from "react";
-import { Link } from "react-router";
-import styled from "styled-components";
-import { useTheme } from "../contexts/ThemeContext";
 
 type AuthFormProps = {
   mode: "login" | "register";
@@ -27,7 +23,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -47,17 +42,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
       setMessage("A senha deve ter pelo menos 8 caracteres.");
       return;
     }
-
-  const { theme, toggleTheme } = useTheme();
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [message, setMessage] = useState("");
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage("");
 
     if (isRegister && password !== confirmPassword) {
       setMessage("As senhas não coincidem.");
@@ -91,15 +75,12 @@ export default function AuthForm({ mode }: AuthFormProps) {
           case 401:
             setMessage("Email ou senha incorretos.");
             break;
-
           case 409:
             setMessage("Este email já está cadastrado.");
             break;
-
           case 422:
             setMessage(error.message);
             break;
-
           default:
             setMessage(error.message);
         }
@@ -111,8 +92,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
     } finally {
       setLoading(false);
     }
-    // Próxima etapa: integrar com os endpoints do FastAPI.
-    setMessage("Formulário validado. Integração com a API pendente.");
   }
 
   return (
@@ -185,16 +164,14 @@ export default function AuthForm({ mode }: AuthFormProps) {
             maxLength={isRegister ? 128 : undefined}
             required
             disabled={loading}
-            autoComplete={isRegister ? "new-password" : "current-password"}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
           />
         </Field>
 
         {isRegister && (
           <Field>
-            <label htmlFor="confirmPassword">Confirmar senha</label>
+            <label htmlFor="confirmPassword">
+              Confirmar senha
+            </label>
             <Input
               id="confirmPassword"
               name="confirmPassword"
@@ -207,17 +184,11 @@ export default function AuthForm({ mode }: AuthFormProps) {
               }
               required
               disabled={loading}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              required
             />
           </Field>
         )}
 
-        {message && (
-          <Message role="alert">
-            {message}
-          </Message>
-        )}
+        {message && <Message role="alert">{message}</Message>}
 
         <SubmitButton type="submit" disabled={loading}>
           {loading
@@ -225,10 +196,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
             : isRegister
               ? "Cadastrar →"
               : "Entrar →"}
-        {message && <Message role="status">{message}</Message>}
-
-        <SubmitButton type="submit">
-          {isRegister ? "Cadastrar →" : "Entrar →"}
         </SubmitButton>
 
         <Footer>
@@ -241,11 +208,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
             <>
               Ainda não possui conta?{" "}
               <Link to="/register">Cadastre-se</Link>
-              Já possui uma conta? <Link to="/login">Entrar</Link>
-            </>
-          ) : (
-            <>
-              Ainda não possui conta? <Link to="/register">Cadastre-se</Link>
             </>
           )}
         </Footer>
@@ -253,7 +215,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
     </Page>
   );
 }
-
 
 const Page = styled.main`
   min-height: 100vh;
@@ -350,6 +311,11 @@ const Input = styled.input`
   &:focus {
     border-color: var(--focus);
   }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
 `;
 
 const SubmitButton = styled.button`
@@ -367,19 +333,20 @@ const SubmitButton = styled.button`
   font-weight: 700;
   cursor: pointer;
 
-  &:hover {
+  &:hover:not(:disabled) {
     filter: brightness(0.96);
   }
 
-  &:active {
+  &:active:not(:disabled) {
     transform: translate(4px, 4px);
     box-shadow: none;
+  }
+
   &:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-  filter: none;
-  transform: none;
-}
+    opacity: 0.65;
+    cursor: not-allowed;
+    filter: none;
+    transform: none;
   }
 `;
 
