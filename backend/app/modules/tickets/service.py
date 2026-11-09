@@ -30,7 +30,9 @@ class TicketService:
         self.tickets = tickets
 
     async def create(self, user: User, data: TicketCreate) -> Ticket:
-        ticket = Ticket(**data.model_dump(), created_by_id=user.id) #data.model_dump() transforma o objeto em um dicionário
+        ticket = Ticket(
+            **data.model_dump(), created_by_id=user.id
+        )  # data.model_dump() transforma o objeto em um dicionário
         self.tickets.add(ticket)
         await self.session.commit()
         await self.session.refresh(ticket)

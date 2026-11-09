@@ -51,7 +51,7 @@ class TicketRepository:
             order_by = (column.asc(), Ticket.id.asc())
         else:
             order_by = (column.desc(), Ticket.id.desc())
-        tickets = await self.session.scalars( #scalars/scalar é quando a query é feita
+        tickets = await self.session.scalars(  # scalars/scalar é quando a query é feita
             select(Ticket)
             .where(*conditions)
             .order_by(*order_by)

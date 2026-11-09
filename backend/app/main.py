@@ -18,7 +18,9 @@ from app.modules.users.router import router as users_router
 async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     await create_first_admin()
     yield
-    await engine.dispose() # engine é o objeto de conexão com o db do SQLAlchemy, dispose libera o pool
+    await (
+        engine.dispose()
+    )  # engine é o objeto de conexão com o db do SQLAlchemy, dispose libera o pool
 
 
 app = FastAPI(title=get_settings().app_name, version="0.1.0", lifespan=lifespan)
