@@ -11,17 +11,32 @@ from app.modules.health.router import router as health_router
 from app.modules.tickets.router import router as tickets_router
 from app.modules.users.bootstrap import create_first_admin
 from app.modules.users.router import router as users_router
+from fastapi.middleware.cors import CORSMiddleware
 
 
-@asynccontextmanager #cria um gerenciador de contexto assíncrono para o ciclo de vida do FastAPI
+@asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
-    #tipo de valor retornado é um gerador assíncrono que não produz valores (None) e não recebe valores (None)
     await create_first_admin()
     yield
     await engine.dispose() # engine é o objeto de conexão com o db do SQLAlchemy, dispose libera o pool
 
 
 app = FastAPI(title=get_settings().app_name, version="0.1.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-CSRF-Protection",
+    ],
+)
 
 register_exception_handlers(app)
 

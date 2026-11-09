@@ -1,3 +1,12 @@
+
+import { useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router";
+import styled from "styled-components";
+
+import { useTheme } from "../contexts/ThemeContext";
+import { useAuth } from "../contexts/AuthContext";
+import { userService } from "../services/userService";
+import { ApiError } from "../services/api";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import styled from "styled-components";
@@ -9,6 +18,36 @@ type AuthFormProps = {
 
 export default function AuthForm({ mode }: AuthFormProps) {
   const isRegister = mode === "register";
+
+  const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
+  const { login } = useAuth();
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (loading) return;
+
+    setMessage("");
+
+    if (isRegister && !name.trim()) {
+      setMessage("Informe seu nome.");
+      return;
+    }
+
+    if (isRegister && password.length < 8) {
+      setMessage("A senha deve ter pelo menos 8 caracteres.");
+      return;
+    }
+
   const { theme, toggleTheme } = useTheme();
 
   const [email, setEmail] = useState("");
@@ -25,6 +64,53 @@ export default function AuthForm({ mode }: AuthFormProps) {
       return;
     }
 
+    setLoading(true);
+
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+
+      if (isRegister) {
+        await userService.register({
+          name: name.trim(),
+          email: normalizedEmail,
+          password,
+        });
+
+        navigate("/login", { replace: true });
+      } else {
+        await login({
+          email: normalizedEmail,
+          password,
+        });
+
+        navigate("/dashboard", { replace: true });
+      }
+    } catch (error) {
+      if (error instanceof ApiError) {
+        switch (error.status) {
+          case 401:
+            setMessage("Email ou senha incorretos.");
+            break;
+
+          case 409:
+            setMessage("Este email já está cadastrado.");
+            break;
+
+          case 422:
+            setMessage(error.message);
+            break;
+
+          default:
+            setMessage(error.message);
+        }
+      } else {
+        setMessage(
+          "Não foi possível conectar ao servidor. Tente novamente."
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
     // Próxima etapa: integrar com os endpoints do FastAPI.
     setMessage("Formulário validado. Integração com a API pendente.");
   }
@@ -49,6 +135,25 @@ export default function AuthForm({ mode }: AuthFormProps) {
           </span>
         </Title>
 
+        {isRegister && (
+          <Field>
+            <label htmlFor="name">Nome</label>
+            <Input
+              id="name"
+              name="name"
+              type="text"
+              placeholder="Seu nome completo"
+              autoComplete="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              minLength={1}
+              maxLength={120}
+              required
+              disabled={loading}
+            />
+          </Field>
+        )}
+
         <Field>
           <label htmlFor="email">Email</label>
           <Input
@@ -60,6 +165,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
+            disabled={loading}
           />
         </Field>
 
@@ -70,6 +176,15 @@ export default function AuthForm({ mode }: AuthFormProps) {
             name="password"
             type="password"
             placeholder="Digite sua senha"
+            autoComplete={
+              isRegister ? "new-password" : "current-password"
+            }
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            minLength={isRegister ? 8 : undefined}
+            maxLength={isRegister ? 128 : undefined}
+            required
+            disabled={loading}
             autoComplete={isRegister ? "new-password" : "current-password"}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -87,12 +202,29 @@ export default function AuthForm({ mode }: AuthFormProps) {
               placeholder="Repita sua senha"
               autoComplete="new-password"
               value={confirmPassword}
+              onChange={(event) =>
+                setConfirmPassword(event.target.value)
+              }
+              required
+              disabled={loading}
               onChange={(event) => setConfirmPassword(event.target.value)}
               required
             />
           </Field>
         )}
 
+        {message && (
+          <Message role="alert">
+            {message}
+          </Message>
+        )}
+
+        <SubmitButton type="submit" disabled={loading}>
+          {loading
+            ? "Aguarde..."
+            : isRegister
+              ? "Cadastrar →"
+              : "Entrar →"}
         {message && <Message role="status">{message}</Message>}
 
         <SubmitButton type="submit">
@@ -102,6 +234,13 @@ export default function AuthForm({ mode }: AuthFormProps) {
         <Footer>
           {isRegister ? (
             <>
+              Já possui uma conta?{" "}
+              <Link to="/login">Entrar</Link>
+            </>
+          ) : (
+            <>
+              Ainda não possui conta?{" "}
+              <Link to="/register">Cadastre-se</Link>
               Já possui uma conta? <Link to="/login">Entrar</Link>
             </>
           ) : (
@@ -114,6 +253,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
     </Page>
   );
 }
+
 
 const Page = styled.main`
   min-height: 100vh;
@@ -234,6 +374,12 @@ const SubmitButton = styled.button`
   &:active {
     transform: translate(4px, 4px);
     box-shadow: none;
+  &:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  filter: none;
+  transform: none;
+}
   }
 `;
 
