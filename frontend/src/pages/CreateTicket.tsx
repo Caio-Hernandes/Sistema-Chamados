@@ -142,7 +142,7 @@ export default function CreateTicket() {
 }
 
 const Container = styled.section`
-  max-width: 900px;
+  max-width: var(--content-width);
   margin: 0 auto;
 `;
 
@@ -156,8 +156,8 @@ const Header = styled.header`
 
   h1 {
     margin: 0 0 8px;
-    font-size: 32px;
-    font-weight: 900;
+    font-size: clamp(26px, 3vw, 32px);
+    font-weight: 750;
   }
 
   p {
@@ -178,9 +178,9 @@ const Form = styled.form`
   padding: 32px;
 
   background: var(--card-bg);
-  border: 2px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 6px 6px 0 var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
 
   @media (max-width: 600px) {
     padding: 20px;
@@ -194,7 +194,7 @@ const Field = styled.div`
 
   label {
     font-size: 14px;
-    font-weight: 800;
+    font-weight: 650;
   }
 
   small {
@@ -208,11 +208,11 @@ const Input = styled.input`
   min-height: 48px;
   padding: 12px;
 
-  border: 2px solid var(--border);
-  border-radius: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   background: var(--input-bg);
   color: var(--text);
-  box-shadow: 4px 4px 0 var(--border);
+  box-shadow: none;
 
   font: inherit;
 
@@ -226,11 +226,11 @@ const Select = styled.select`
   min-height: 48px;
   padding: 12px;
 
-  border: 2px solid var(--border);
-  border-radius: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   background: var(--input-bg);
   color: var(--text);
-  box-shadow: 4px 4px 0 var(--border);
+  box-shadow: none;
 
   font: inherit;
 `;
@@ -240,11 +240,11 @@ const Textarea = styled.textarea`
   padding: 12px;
   resize: vertical;
 
-  border: 2px solid var(--border);
-  border-radius: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   background: var(--input-bg);
   color: var(--text);
-  box-shadow: 4px 4px 0 var(--border);
+  box-shadow: none;
 
   font: inherit;
 
@@ -254,17 +254,18 @@ const Textarea = styled.textarea`
 `;
 
 const SubmitButton = styled.button`
+  align-self: flex-start;
   min-height: 48px;
   padding: 12px 20px;
 
-  border: 2px solid var(--border);
-  border-radius: 5px;
-  background: var(--input-bg);
-  color: var(--text);
-  box-shadow: 4px 4px 0 var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--accent-bg);
+  color: var(--focus);
+  box-shadow: var(--card-shadow);
 
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 650;
   cursor: pointer;
 
   &:disabled {

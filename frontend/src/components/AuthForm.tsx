@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import styled from "styled-components";
 
+import Icon from "./Icon";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
 import { userService } from "../services/userService";
@@ -96,12 +97,13 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <Page>
+      <HomeLink to="/dashboard" aria-label="Voltar para home" title="Home">CHAMADOS.</HomeLink>
       <ThemeButton
         type="button"
         onClick={toggleTheme}
         aria-label={`Ativar modo ${theme === "light" ? "escuro" : "claro"}`}
       >
-        {theme === "light" ? "☾" : "☀"}
+        <Icon name={theme === "light" ? "moon" : "sun"} />
       </ThemeButton>
 
       <FormCard onSubmit={handleSubmit}>
@@ -225,17 +227,34 @@ const Page = styled.main`
   position: relative;
 `;
 
+const HomeLink = styled(Link)`
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  font-weight: 700;
+  text-decoration: none;
+`;
+
 const ThemeButton = styled.button`
+  display: grid;
+  place-items: center;
   position: absolute;
   top: 24px;
   right: 24px;
   width: 44px;
   height: 44px;
-  border: 2px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
   background: var(--input-bg);
   color: var(--text);
-  box-shadow: 4px 4px 0 var(--border);
+  box-shadow: var(--card-shadow);
   font-size: 24px;
   cursor: pointer;
 
@@ -254,9 +273,9 @@ const FormCard = styled.form`
   gap: 22px;
 
   background: var(--card-bg);
-  border: 2px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 6px 6px 0 var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
 
   @media (max-width: 480px) {
     padding: 24px 20px;
@@ -267,7 +286,7 @@ const FormCard = styled.form`
 const Title = styled.h1`
   margin: 0 0 12px;
   font-size: clamp(24px, 5vw, 30px);
-  font-weight: 900;
+  font-weight: 750;
   color: var(--text);
 
   span {
@@ -295,10 +314,10 @@ const Input = styled.input`
   min-height: 48px;
   padding: 12px;
 
-  border: 2px solid var(--border);
-  border-radius: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   background: var(--input-bg);
-  box-shadow: 4px 4px 0 var(--border);
+  box-shadow: var(--card-shadow);
 
   color: var(--text);
   font-size: 15px;
@@ -320,13 +339,13 @@ const Input = styled.input`
 
 const SubmitButton = styled.button`
   width: 100%;
-  min-height: 46px;
+  min-height: 48px;
   margin-top: 12px;
 
-  border: 2px solid var(--border);
-  border-radius: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   background: var(--input-bg);
-  box-shadow: 4px 4px 0 var(--border);
+  box-shadow: var(--card-shadow);
 
   color: var(--text);
   font-size: 16px;

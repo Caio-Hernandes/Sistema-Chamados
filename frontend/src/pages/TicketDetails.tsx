@@ -1,3 +1,4 @@
+import StatusBadge from "../components/StatusBadge";
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
@@ -267,7 +268,7 @@ export default function TicketDetails() {
           <h1>{ticket.title}</h1>
         </div>
 
-        <StatusBadge>
+        <StatusBadge $status={ticket.status}>
           {STATUS_LABELS[ticket.status]}
         </StatusBadge>
       </Header>
@@ -295,7 +296,7 @@ export default function TicketDetails() {
           <Info>
             <strong>Criado por</strong>
             <span>
-              Usuário #{ticket.created_by_id}
+              {ticket.created_by_name || "Nome indisponível"}
             </span>
           </Info>
 
@@ -303,7 +304,7 @@ export default function TicketDetails() {
             <strong>Responsável</strong>
             <span>
               {ticket.assigned_to_id
-                ? `Usuário #${ticket.assigned_to_id}`
+                ? ticket.assigned_to_name || "Nome indisponível"
                 : "Não atribuído"}
             </span>
           </Info>
@@ -432,7 +433,7 @@ export default function TicketDetails() {
                 </span>
 
                 <SmallText>
-                  Usuário #{event.actor_id} •{" "}
+                  {event.actor_name || "Nome indisponível"} •{" "}
                   {formatDate(event.created_at)}
                 </SmallText>
               </HistoryItem>
@@ -444,10 +445,10 @@ export default function TicketDetails() {
   );
 }
 
-const Container = styled.main`
-  max-width: 1100px;
+const Container = styled.div`
+  max-width: var(--content-width);
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: 0;
   color: var(--text);
 `;
 
@@ -477,22 +478,13 @@ const Header = styled.header`
   }
 `;
 
-const StatusBadge = styled.span`
-  padding: 8px 14px;
-  border: 2px solid var(--border);
-  border-radius: 6px;
-  background: var(--input-bg);
-  box-shadow: 3px 3px 0 var(--border);
-  font-weight: 700;
-`;
-
 const Card = styled.section`
   padding: 24px;
   margin-bottom: 24px;
-  border: 2px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
   background: var(--card-bg);
-  box-shadow: 5px 5px 0 var(--border);
+  box-shadow: var(--card-shadow);
 `;
 
 const SectionTitle = styled.h2`
@@ -535,12 +527,13 @@ const Actions = styled.div`
 `;
 
 const ActionButton = styled.button`
+  min-height: 48px;
   padding: 12px 18px;
-  border: 2px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   background: var(--input-bg);
   color: var(--text);
-  box-shadow: 3px 3px 0 var(--border);
+  box-shadow: var(--card-shadow);
   font-weight: 700;
   cursor: pointer;
 
@@ -581,7 +574,7 @@ const SmallText = styled.p`
 
 const Feedback = styled.p`
   padding: 16px;
-  border: 2px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   background: var(--card-bg);
 `;
