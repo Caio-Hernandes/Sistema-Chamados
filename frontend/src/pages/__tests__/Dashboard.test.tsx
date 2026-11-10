@@ -25,6 +25,7 @@ describe("Dashboard", () => {
   beforeEach(() => {
     request.mockReset();
     account.role = "USER";
+    account.name = "Maria Silva";
   });
   it("usa os totais da API por status, incluindo zero e valores além de uma página", async () => {
     totals();
@@ -35,11 +36,12 @@ describe("Dashboard", () => {
     expect(request).toHaveBeenCalledTimes(4);
     expect(screen.getByText("Resumo dos seus chamados.")).toBeInTheDocument();
   });
-  it("identifica administradores como Administrador", async () => {
+  it("exibe o nome cadastrado do administrador", async () => {
     account.role = "ADMIN";
+    account.name = "Equipe de Suporte";
     totals();
     renderDashboard();
-    expect(screen.getByRole("heading", { name: "Olá, Administrador!" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Olá, Equipe de Suporte!" })).toBeInTheDocument();
     expect(await screen.findByText("Resumo de todos os chamados.")).toBeInTheDocument();
   });
   it("permite tentar novamente após falha sem apresentar zero como resultado", async () => {

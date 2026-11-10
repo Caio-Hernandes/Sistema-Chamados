@@ -1,244 +1,271 @@
-# Sistema de Chamados — Backend
+﻿# Sistema de Chamados
 
-API REST para gerenciamento de chamados de suporte técnico, desenvolvida com **Python, FastAPI, SQLAlchemy e PostgreSQL**.
+Aplicação web para gerenciamento de chamados de suporte técnico, com **frontend em React e TypeScript**, **API REST em FastAPI** e **PostgreSQL**.
 
-O projeto utiliza uma arquitetura modular em camadas, com autenticação JWT, autorização por papéis, gerenciamento de chamados, histórico de eventos e controle de concorrência.
+Usuários podem abrir e acompanhar seus chamados; administradores podem assumir atendimentos e registrar sua resolução. A aplicação mantém o histórico das transições de status e aplica permissões conforme o perfil e a relação do usuário com cada chamado.
+
+![Dashboard no tema escuro, com atalhos e resumo dos chamados por status](images/dashboad.png)
+
+## Funcionalidades
+
+- Cadastro, login, logout e restauração de sessão.
+- Dashboard com totais de chamados por status.
+- Listagem com filtro por status, ordenação e paginação.
+- Criação de chamados e consulta de detalhes e histórico.
+- Ações de assumir, resolver, encerrar e reabrir, conforme as permissões.
+- Exclusão de chamados conforme o perfil e o estado atual.
+- Temas claro e escuro, com preferência salva no navegador.
 
 ## Tecnologias
 
-- **Backend:** Python, FastAPI e Pydantic v2
-- **Persistência:** SQLAlchemy 2.0 assíncrono e PostgreSQL
-- **Autenticação:** JWT, refresh tokens e controle de permissões
-- **Infraestrutura:** Docker, Docker Compose e Alembic
-- **Testes:** Pytest e HTTPX
+| Área | Tecnologias |
+| --- | --- |
+| Frontend | React, TypeScript, Vite, React Router e styled-components |
+| Comunicação com a API | Fetch API, JWT Bearer e cookies de refresh |
+| Backend | Python 3.12+, FastAPI e Pydantic v2 |
+| Persistência | SQLAlchemy assíncrono, asyncpg e PostgreSQL |
+| Migrações | Alembic |
+| Infraestrutura | Docker Compose e Nginx |
+| Qualidade do frontend | ESLint, Vitest e Testing Library |
+| Qualidade do backend | Ruff, Pytest e HTTPX |
+| Integração contínua | GitHub Actions |
 
-## 1. Arquitetura
+## Executar com Docker
 
-O backend segue uma arquitetura de **monólito modular**, organizado por funcionalidades (`auth`, `users` e `tickets`).
+Pré-requisito: Docker com Docker Compose disponível.
 
-```text
-HTTP Request
-     |
-     v
-Router (Controller)
-     |
-     v
-Service (Regras de negócio)
-     |
-     v
-Repository (Persistência)
-     |
-     v
-SQLAlchemy / PostgreSQL
+1. Na raiz do repositório, copie `.env.example` para `.env`:
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+   No Linux ou macOS, use `cp .env.example .env`.
+
+2. Edite o `.env`: defina `POSTGRES_PASSWORD`, uma `JWT_SECRET_KEY` própria com pelo menos 32 caracteres e as credenciais `FIRST_ADMIN_EMAIL` e `FIRST_ADMIN_PASSWORD`. `FIRST_ADMIN_NAME` define o nome do administrador inicial.
+
+3. Construa e inicie os serviços:
+
+   ```sh
+   docker compose up --build -d
+   ```
+
+| Serviço | Endereço |
+| --- | --- |
+| Aplicação web | http://localhost:8080 |
+| API REST | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/docs |
+| Health check | http://localhost:8000/health |
+| PostgreSQL no host | `localhost:5433` |
+
+A porta externa da API pode ser alterada por `API_PORT`. O Compose inicia o banco, executa as migrações e aguarda a API ficar saudável antes de iniciar o frontend. Os dados do PostgreSQL ficam no volume `pgdata`.
+
+O administrador inicial é criado na inicialização da API quando as credenciais estão configuradas e o e-mail ainda não existe. O cadastro público cria usuários com perfil `USER`.
+
+Para acompanhar os logs ou parar os serviços:
+
+```sh
+docker compose logs -f
+docker compose down
 ```
 
-Cada camada possui responsabilidades específicas:
+## Desenvolvimento local
+
+Use Python 3.12+, `uv`, Node.js 24 com npm e PostgreSQL. Os comandos abaixo partem da raiz do repositório, em terminais separados.
+
+### Backend
+
+Prepare o `.env` conforme a seção anterior. Para usar apenas o banco do Compose:
+
+```sh
+docker compose up -d db
+```
+
+Nesse caso, ajuste as URLs no `.env` para a porta **5433** exposta no host:
+
+```dotenv
+DATABASE_URL=postgresql+asyncpg://chamados:SUA_SENHA@localhost:5433/chamados
+TEST_DATABASE_URL=postgresql+asyncpg://chamados:SUA_SENHA@localhost:5433/chamados_test
+```
+
+Use o usuário, a senha e o banco definidos no seu `.env`. Para um PostgreSQL instalado localmente, informe a porta dessa instalação. O mapeamento `5433:5432` está definido diretamente no `compose.yaml`; alterar `POSTGRES_PORT` no `.env` não muda esse mapeamento.
+
+Instale as dependências, aplique as migrações e inicie a API:
+
+```sh
+cd backend
+uv sync --locked --group dev
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
+```
+
+As configurações são carregadas de `../.env` e `.env`, relativamente ao diretório de execução. A API fica disponível em http://localhost:8000.
+
+### Frontend
+
+Crie ou ajuste `frontend/.env` com a URL da API, sem barra ao final:
+
+```dotenv
+VITE_API_URL=http://localhost:8000
+```
+
+Em outro terminal:
+
+```sh
+cd frontend
+npm ci
+npm run dev -- --port 5173 --strictPort
+```
+
+Acesse http://localhost:5173. O backend permite CORS com credenciais para `http://localhost:5173` e `http://127.0.0.1:5173`. Use o mesmo hostname no frontend e na URL da API para o fluxo de cookies de sessão.
+
+Para desenvolvimento via HTTP, mantenha `REFRESH_COOKIE_SECURE=false`. Em uma implantação com HTTPS, configure essa opção como `true`.
+
+## Frontend
+
+O frontend é uma SPA. O React Router organiza a navegação e o componente `ProtectedRoute` protege as telas que exigem autenticação.
+
+| Rota | Tela |
+| --- | --- |
+| `/login` | Login |
+| `/register` | Cadastro de usuário |
+| `/dashboard` | Resumo dos chamados por status |
+| `/tickets` | Listagem, filtros, ordenação e paginação |
+| `/tickets/new` | Abertura de chamado |
+| `/tickets/:id` | Detalhes, histórico e ações disponíveis |
+
+### Listagem de chamados
+
+A tela de chamados permite filtrar por status, escolher a ordenação e acessar os detalhes de cada solicitação.
+
+![Listagem de chamados no tema escuro, com filtros e acesso aos detalhes](images/chamados.png)
+
+### Abertura de chamado
+
+O formulário de abertura reúne título, categoria e descrição do problema para solicitar atendimento.
+
+![Formulário de abertura de chamado no tema claro](images/Abrir_chamado.png)
+
+### Integração com a API
+
+O `AuthContext` centraliza a sessão e mantém o access token em memória. Na abertura da aplicação, tenta restaurar a sessão por refresh; ao receber `401` em uma requisição autenticada, tenta renovar o token e repetir a requisição. O refresh token é enviado pelo navegador em um cookie `HttpOnly`.
+
+Os serviços encapsulam as chamadas HTTP de autenticação, usuários e chamados. O cliente compartilhado usa `credentials: "include"` e converte respostas de erro da API em mensagens para a interface. O `ThemeContext` gerencia o tema e persiste a preferência em `localStorage`.
+
+No Docker, o Vite gera os arquivos estáticos e o Nginx os serve. A URL da API é `/api`: o Nginx encaminha essas chamadas para `api:8000`, ajusta o caminho do cookie de refresh e permite acesso direto às rotas da SPA. `VITE_API_URL` é incorporada durante o build; alterações exigem gerar o frontend novamente.
+
+## Backend
+
+A API segue uma arquitetura de monólito modular, organizada por funcionalidades: `auth`, `users`, `tickets` e `health`.
+
+```text
+Frontend React → Router FastAPI → Service → Repository → PostgreSQL
+```
 
 | Camada | Responsabilidade |
-|---|---|
+| --- | --- |
 | Router | Endpoints HTTP, validação e respostas |
 | Service | Regras de negócio, permissões e transações |
-| Repository | Consultas e operações no banco |
+| Repository | Consultas e operações de persistência |
 | Models | Mapeamento ORM das entidades |
 | Schemas | Contratos de entrada e saída com Pydantic |
-| Dependencies | Construção e injeção dos serviços |
+| Dependencies | Construção e injeção de serviços com `Depends` |
 
-Essa separação evita concentrar lógica de negócio e acesso ao banco diretamente nos controllers.
+Os serviços recebem contratos de persistência definidos com `Protocol`, facilitando a substituição de repositories e os testes unitários. As consultas utilizam filtros, paginação e uma lista explícita de campos permitidos para ordenação. O Alembic versiona o schema do banco.
 
-## 2. Injeção de dependências e desacoplamento
+### Autenticação e permissões
 
-O FastAPI utiliza `Depends` e `Annotated` para construir e disponibilizar as dependências necessárias em cada requisição.
+A autenticação utiliza JWT Bearer, com validação de assinatura, expiração e claims obrigatórias. As senhas são protegidas com Argon2. O refresh token usa cookie `HttpOnly`, `SameSite=Strict` e caminho `/auth`; as operações de refresh e logout exigem o cabeçalho `X-CSRF-Protection: 1`.
 
-Exemplo:
+- **USER:** consulta seus próprios chamados, edita e exclui os que ainda estão abertos, encerra os resolvidos e pode reabri-los.
+- **ADMIN:** consulta todos os chamados, assume atendimentos, resolve aqueles sob sua responsabilidade, encerra chamados resolvidos e pode excluir chamados.
 
-```python
-TicketServiceDep = Annotated[
-    TicketService,
-    Depends(get_ticket_service),
-]
+A edição é restrita ao criador enquanto o chamado está aberto. A reabertura também é restrita ao criador. As permissões são verificadas no backend, além dos controles exibidos na interface.
 
-def get_ticket_service(session: SessionDep) -> TicketService:
-    return TicketService(
-        session=session,
-        tickets=TicketRepository(session),
-    )
-```
-
-O `TicketService` recebe o repository por meio do construtor:
-
-```python
-class TicketService:
-    def __init__(
-        self,
-        session: AsyncSession,
-        tickets: TicketRepositoryProtocol,
-    ) -> None:
-        self.session = session
-        self.tickets = tickets
-```
-
-O uso de **`Protocol`** estabelece um contrato para as operações de persistência, permitindo substituir a implementação concreta sem modificar a lógica de negócio.
-
-Isso reduz o acoplamento e facilita testes unitários com repositories simulados.
-
-A sessão SQLAlchemy é gerenciada por uma dependência com `yield`, garantindo seu encerramento após a requisição.
-
-## 3. Persistência e construção de consultas
-
-O SQLAlchemy permite construir instruções SQL antes de executá-las.
-
-```python
-query = (
-    select(Ticket)
-    .where(Ticket.status == TicketStatus.OPEN)
-    .order_by(Ticket.created_at.desc())
-    .limit(10)
-)
-```
-
-A consulta é executada posteriormente:
-
-```python
-result = await session.scalars(query)
-tickets = list(result)
-```
-
-Essa separação facilita a composição de consultas com filtros, ordenação e paginação.
-
-O repository também utiliza filtros dinâmicos e uma lista explícita de colunas permitidas para ordenação, impedindo que o cliente escolha identificadores SQL arbitrários.
-
-### Transações
-
-A criação de chamados utiliza o gerenciamento transacional do SQLAlchemy:
-
-```python
-ticket = Ticket(
-    **data.model_dump(),
-    created_by_id=user.id,
-)
-
-self.tickets.add(ticket)
-await self.session.commit()
-await self.session.refresh(ticket)
-```
-
-O `add()` registra o objeto na sessão, o `commit()` confirma a transação e o `refresh()` atualiza os atributos com os valores persistidos.
-
-## 4. Concorrência e idempotência
-
-O backend utiliza **atualizações condicionais atômicas** para proteger operações sensíveis ao estado atual dos chamados.
-
-Exemplo:
-
-```python
-statement = update(Ticket).where(
-    Ticket.id == ticket_id,
-    Ticket.status == expected_status,
-)
-
-if require_unassigned:
-    statement = statement.where(
-        Ticket.assigned_to_id.is_(None)
-    )
-```
-
-Após a execução:
-
-```python
-return result.rowcount == 1
-```
-
-Isso permite identificar se a atualização realmente aconteceu.
-
-Por exemplo, duas requisições tentando assumir simultaneamente o mesmo chamado não devem conseguir sobrescrever uma à outra: a atualização só ocorre se o chamado continuar disponível no momento da execução.
-
-### Idempotência
-
-O controle de concorrência não significa que todas as operações sejam idempotentes.
-
-- **POST:** requisições repetidas podem criar chamados duplicados.
-- **DELETE:** repetir a exclusão mantém o recurso inexistente, embora a resposta HTTP possa mudar.
-- **Transições de status:** uma segunda execução pode ser rejeitada porque o status esperado já foi alterado.
-
-Uma possível evolução é implementar `Idempotency-Key` para deduplicar operações de criação.
-
-## 5. Autenticação e autorização
-
-A autenticação utiliza **JWT Bearer**, com validação de assinatura, expiração e claims obrigatórias (`sub`, `exp` e `iat`).
-
-O backend também utiliza refresh tokens para renovação de sessões.
-
-O usuário autenticado é identificado a partir do token e consultado no banco de dados.
-
-As permissões são aplicadas no service, considerando o papel do usuário e sua relação com o chamado:
-
-- `USER`: consulta e gerencia seus próprios chamados, respeitando o status.
-- `ADMIN`: consulta todos os chamados, assume atendimentos, resolve chamados sob sua responsabilidade e pode excluí-los.
-
-O criador de um chamado é definido pelo usuário autenticado:
-
-```python
-created_by_id=user.id
-```
-
-Isso impede que o cliente atribua a criação de um chamado arbitrariamente a outro usuário.
-
-## 6. Ciclo de vida dos chamados
-
-Os chamados seguem transições de estado controladas:
+### Ciclo de vida dos chamados
 
 ```text
-OPEN
-  |
-  | ADMIN assume
-  v
-IN_PROGRESS
-  |
-  | ADMIN responsável resolve
-  v
-RESOLVED
-  |
-  | Criador ou ADMIN encerra
-  v
-CLOSED
+OPEN → IN_PROGRESS → RESOLVED → CLOSED
+          ↑              |
+          └── reabrir ────┘
 ```
 
-O criador também pode reabrir um chamado `RESOLVED`, retornando-o para `IN_PROGRESS`.
+Um administrador assume um chamado aberto e o responsável registra a resolução. O criador ou um administrador pode encerrar um chamado resolvido; o criador pode reabri-lo para retomar o atendimento.
 
-As transições possuem endpoints específicos, como:
+As transições geram eventos de histórico e usam atualizações condicionais atômicas para detectar conflitos de estado, como duas tentativas simultâneas de assumir o mesmo chamado. Isso não deduplica a criação: repetir `POST /tickets` pode criar chamados distintos.
 
-| Endpoint | Operação |
-|---|---|
-| `POST /tickets` | Criar chamado |
-| `GET /tickets` | Listar e filtrar |
-| `PATCH /tickets/{id}` | Editar chamado |
-| `DELETE /tickets/{id}` | Excluir chamado |
-| `POST /tickets/{id}/assign` | Assumir chamado |
-| `POST /tickets/{id}/resolve` | Resolver chamado |
-| `POST /tickets/{id}/close` | Encerrar chamado |
-| `POST /tickets/{id}/reopen` | Reabrir chamado |
-| `GET /tickets/{id}/history` | Consultar histórico |
+### Principais endpoints
 
-O histórico é armazenado em eventos associados aos chamados, permitindo rastrear mudanças relevantes.
+| Método | Caminho | Operação |
+| --- | --- | --- |
+| `POST` | `/users` | Cadastrar usuário |
+| `GET` | `/users/me` | Consultar usuário autenticado |
+| `POST` | `/auth/login` | Autenticar com formulário (`username` recebe o e-mail) |
+| `POST` | `/auth/refresh` | Renovar a sessão |
+| `POST` | `/auth/logout` | Encerrar a sessão |
+| `GET` / `POST` | `/tickets` | Listar ou criar chamados |
+| `GET` / `PATCH` / `DELETE` | `/tickets/{id}` | Consultar, editar ou excluir chamado |
+| `POST` | `/tickets/{id}/assign` | Assumir chamado |
+| `POST` | `/tickets/{id}/resolve` | Resolver chamado |
+| `POST` | `/tickets/{id}/close` | Encerrar chamado |
+| `POST` | `/tickets/{id}/reopen` | Reabrir chamado |
+| `GET` | `/tickets/{id}/history` | Consultar histórico |
 
-## 7. Integridade e manutenção
+Os contratos, parâmetros e respostas estão disponíveis no Swagger UI em `/docs`.
 
-O backend utiliza mecanismos complementares para manter a consistência dos dados:
+![API no Insomnia](images/insomnia.png)
 
-- **Pydantic:** validação de campos, tipos, tamanhos e enums.
-- **PostgreSQL:** constraints relacionais, chaves estrangeiras e unicidade.
-- **SQLAlchemy:** gerenciamento de sessões e transações.
-- **Alembic:** versionamento das alterações do schema.
-- **Repositories:** centralização das operações de persistência.
-- **Protocols:** contratos que facilitam substituições e testes.
-- **Atualizações condicionais:** proteção contra conflitos de concorrência.
+## Estrutura do repositório
 
-A API também utiliza códigos HTTP apropriados, como `401` para falhas de autenticação, `403` para falta de permissão, `404` para recursos inexistentes e `409` para conflitos de estado.
+```text
+.
+├── backend/
+│   ├── app/
+│   │   ├── core/           # Configuração, segurança e erros
+│   │   ├── db/             # Sessões e base ORM
+│   │   ├── modules/        # Auth, users, tickets e health
+│   │   ├── dependencies.py
+│   │   └── main.py
+│   ├── alembic/            # Migrações do banco
+│   ├── tests/              # Testes unitários e de integração
+│   └── pyproject.toml
+├── frontend/
+│   ├── src/
+│   │   ├── components/     # Layout, formulários e componentes reutilizáveis
+│   │   ├── contexts/       # Autenticação e tema
+│   │   ├── pages/          # Telas e seus testes
+│   │   ├── services/       # Cliente HTTP e serviços da API
+│   │   ├── styles/         # Estilos globais
+│   │   ├── test/           # Configuração dos testes
+│   │   ├── types/          # Tipos de usuários, autenticação e chamados
+│   │   └── App.tsx         # Rotas da aplicação
+│   ├── Dockerfile
+│   └── nginx.conf
+├── .github/workflows/ci.yml
+├── .env.example
+└── compose.yaml
+```
 
-## Considerações finais
+## Qualidade e testes
 
-O backend foi desenvolvido para demonstrar práticas de engenharia de software além de um CRUD convencional.
+No diretório `backend/`:
 
-As principais decisões incluem **arquitetura em camadas, injeção de dependências, desacoplamento por contratos, consultas dinâmicas, controle transacional, autenticação segura e proteção contra operações concorrentes conflitantes**.
+```sh
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest -q
+```
 
-A estrutura permite evoluir a aplicação e integrar um frontend React sem comprometer a organização das regras de negócio.
+A suíte de backend exige `DATABASE_URL`, `TEST_DATABASE_URL` e `JWT_SECRET_KEY` configuradas. Ela cria o banco de testes e aplica as migrações automaticamente; o usuário do PostgreSQL precisa de permissão para criar esse banco. Use um banco exclusivo para testes: suas tabelas são limpas entre os testes.
+
+No diretório `frontend/`:
+
+```sh
+npm run lint
+npm test
+npm run build
+```
+
+Os testes do frontend usam Vitest, jsdom e Testing Library para verificar componentes, páginas e serviços. O comando de build verifica os tipos com TypeScript e gera os arquivos em `frontend/dist`. Para visualizar esse build localmente, use `npm run preview`.
+
+O workflow [ci.yml](.github/workflows/ci.yml) executa lint, formatação e testes do backend com PostgreSQL, além do build da imagem da API. Para o frontend, executa ESLint, testes e build de produção.

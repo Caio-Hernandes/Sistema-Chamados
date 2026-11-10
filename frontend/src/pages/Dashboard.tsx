@@ -43,7 +43,7 @@ export default function Dashboard() {
   return (
     <Container>
       <Heading>
-        <h1>Olá, {user?.role === "ADMIN" ? "Administrador" : user?.name?.split(" ")[0]}!</h1>
+        <h1>Olá, {user?.role === "ADMIN" ? user?.name : user?.name?.split(" ")[0]}!</h1>
         <p>Bem-vindo ao seu painel de chamados.</p>
       </Heading>
 

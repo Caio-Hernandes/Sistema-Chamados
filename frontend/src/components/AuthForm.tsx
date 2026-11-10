@@ -97,7 +97,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <Page>
-      <HomeLink to="/dashboard" aria-label="Voltar para home" title="Home">CHAMADOS.</HomeLink>
       <ThemeButton
         type="button"
         onClick={toggleTheme}
@@ -225,21 +224,6 @@ const Page = styled.main`
   justify-content: center;
   padding: 80px 20px;
   position: relative;
-`;
-
-const HomeLink = styled(Link)`
-  display: grid;
-  place-items: center;
-  min-height: 44px;
-  position: absolute;
-  top: 24px;
-  left: 24px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--input-bg);
-  font-weight: 700;
-  text-decoration: none;
 `;
 
 const ThemeButton = styled.button`
